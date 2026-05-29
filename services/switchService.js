@@ -3,6 +3,7 @@ const { routeToIssuer } = require("./issuerGatewayService");
 const { validatePin } = require("./pinValidationService");
 const { authorizeTransaction } = require("./authorizationService");
 const { publishEvent } = require("./eventPublisherService");
+const { saveTransaction } = require("../store/transactionStore");
 
 function processTransaction(transaction) {
   const transactionId = `TXN-${Date.now()}`;
@@ -25,23 +26,25 @@ function processTransaction(transaction) {
 
   const authorizationResult = authorizeTransaction(transaction);
 
-  publishEvent("AUTHORIZATION_EVENT", {
-    transactionId,
-    status: authorizationResult.status,
-    reason: authorizationResult.reason,
-    amount: transaction.amount
-  });
+const response = {
+  transactionId,
+  status: authorizationResult.status,
+  reason: authorizationResult.reason,
+  network: transaction.network,
+  channel: transaction.channel,
+  scenario,
+  issuerRouting,
+  pinValid
+};
 
-  return {
-    transactionId,
-    status: authorizationResult.status,
-    reason: authorizationResult.reason,
-    network: transaction.network,
-    channel: transaction.channel,
-    scenario,
-    issuerRouting,
-    pinValid
-  };
+saveTransaction(response);
+
+publishEvent(
+  "AUTHORIZATION_EVENT",
+  response
+);
+
+return response;
 }
 
 module.exports = {
