@@ -1,8 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-
 const transactionRoutes = require("./routes/transactionRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +21,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/transactions", transactionRoutes);
+app.use("/admin", adminRoutes);
 
 app.listen(PORT, () => {
   console.log(`HSMP running on port ${PORT}`);
