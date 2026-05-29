@@ -5,6 +5,7 @@ const { authorizeTransaction } = require("./authorizationService");
 const { publishEvent } = require("./eventPublisherService");
 const { saveTransaction } = require("../store/transactionStore");
 const { buildFraudEvent } = require("./fraudEventService");
+const { buildSettlementEvent } = require("./settlementEventService");
 
 function processTransaction(transaction) {
   const transactionId = `TXN-${Date.now()}`;
@@ -44,6 +45,8 @@ const fraudEvent =
     transaction
   );
 
+const settlementEvent = buildSettlementEvent(response, transaction);
+
 saveTransaction(response);
 
 publishEvent(
@@ -54,6 +57,12 @@ publishEvent(
   "FRAUD_EVENT",
   fraudEvent
 );
+if (settlementEvent) {
+  publishEvent(
+    "SETTLEMENT_EVENT",
+    settlementEvent
+  );
+}
 
 return response;
 }
