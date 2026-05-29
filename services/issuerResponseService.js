@@ -2,23 +2,33 @@ function getIssuerResponse(transaction) {
 
   const maxRetries = 2;
 
-  if (transaction.simulateTimeout === true) {
+  const timeoutAttempts =
+    transaction.simulateTimeoutAttempts || 0;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+
+    if (attempt <= timeoutAttempts) {
 
       console.log(
-        `[RETRY] Attempt ${attempt} for issuer response`
+        `[RETRY] Attempt ${attempt} timed out`
       );
 
+      continue;
+    }
+
+    if (attempt > 1) {
+      console.log(
+        `[RETRY] Attempt ${attempt} succeeded`
+      );
     }
 
     return {
-      status: "TIMEOUT"
+      status: "SUCCESS"
     };
   }
 
   return {
-    status: "SUCCESS"
+    status: "TIMEOUT"
   };
 }
 
