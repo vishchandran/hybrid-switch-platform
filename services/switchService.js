@@ -4,6 +4,7 @@ const { selectSwitchNode } = require("./switchNodeSelectorService");
 const { routeToIssuer } = require("./issuerGatewayService");
 const { validatePin } = require("./pinValidationService");
 const { authorizeTransaction } = require("./authorizationService");
+const { processStandIn } = require("./standInProcessingService");
 const { publishEvent } = require("./eventPublisherService");
 const { saveTransaction } = require("../store/transactionStore");
 const { buildFraudEvent } = require("./fraudEventService");
@@ -17,11 +18,12 @@ function processTransaction(transaction) {
   const issuerRouting = routeToIssuer(transaction);
   const issuerResponse = getIssuerResponse(transaction);
   if (issuerResponse.status === "TIMEOUT") {
-  const response = {
+    const standInResult = processStandIn(transaction);
+    const response = {
     transactionId,
     switchNode,
-    status: "DECLINED",
-    reason: "ISSUER_TIMEOUT",
+    status: standInResult.status,
+    reason: standInResult.reason,
     network: transaction.network,
     channel: transaction.channel,
     scenario,
