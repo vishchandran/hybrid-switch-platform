@@ -31,7 +31,15 @@ function authorizeTransaction(transaction) {
       reason: "EXCEEDS_LIMIT"
     };
   }
-
+if (
+  transaction.transactionType === "CASH_WITHDRAWAL" &&
+  transaction.amount > 500
+) {
+  return {
+    status: "DECLINED",
+    reason: "ATM_WITHDRAWAL_LIMIT_EXCEEDED"
+  };
+}
   if (transaction.amount > account.availableBalance) {
     return {
       status: "DECLINED",
