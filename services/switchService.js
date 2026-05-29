@@ -1,3 +1,4 @@
+const { getIssuerResponse } = require("./issuerResponseService");
 const { resolveScenario } = require("./scenarioResolverService");
 const { selectSwitchNode } = require("./switchNodeSelectorService");
 const { routeToIssuer } = require("./issuerGatewayService");
@@ -14,6 +15,33 @@ function processTransaction(transaction) {
   const switchNode = selectSwitchNode(transactionId);
   const scenario = resolveScenario(transaction);
   const issuerRouting = routeToIssuer(transaction);
+  const issuerResponse = getIssuerResponse(transaction);
+  if (issuerResponse.status === "TIMEOUT") {
+  const response = {
+    transactionId,
+    switchNode,
+    status: "DECLINED",
+    reason: "ISSUER_TIMEOUT",
+    network: transaction.network,
+    channel: transaction.channel,
+    scenario,
+    issuerRouting
+  };
+
+  const analyticsEvent = buildAnalyticsEvent(response, transaction);
+  saveTransaction(response);
+
+  publishEvent(
+    "AUTHORIZATION_EVENT",
+    response
+  );
+  publishEvent(
+  "ANALYTICS_EVENT",
+  analyticsEvent
+);
+
+  return response;
+}
   const pinValid = validatePin(transaction.pin);
 
   if (!pinValid) {
