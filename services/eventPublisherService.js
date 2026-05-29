@@ -1,3 +1,4 @@
+const { consumeEvent } = require("../consumers/eventConsumerService");
 const topicMap = {
   AUTHORIZATION_EVENT: "authorization-events",
   FRAUD_EVENT: "fraud-events",
@@ -13,6 +14,7 @@ function publishEvent(eventType, payload) {
     `[TOPIC] ${topic} [EVENT] ${eventType}`,
     JSON.stringify(payload)
   );
+  consumeEvent(topic, eventType, payload);
 }
 
 module.exports = {
