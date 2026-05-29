@@ -6,6 +6,7 @@ const { publishEvent } = require("./eventPublisherService");
 const { saveTransaction } = require("../store/transactionStore");
 const { buildFraudEvent } = require("./fraudEventService");
 const { buildSettlementEvent } = require("./settlementEventService");
+const { buildAnalyticsEvent } = require("./analyticsEventService");
 
 function processTransaction(transaction) {
   const transactionId = `TXN-${Date.now()}`;
@@ -46,6 +47,7 @@ const fraudEvent =
   );
 
 const settlementEvent = buildSettlementEvent(response, transaction);
+const analyticsEvent = buildAnalyticsEvent(response, transaction);
 
 saveTransaction(response);
 
@@ -63,7 +65,10 @@ if (settlementEvent) {
     settlementEvent
   );
 }
-
+publishEvent(
+  "ANALYTICS_EVENT",
+  analyticsEvent
+);
 return response;
 }
 
