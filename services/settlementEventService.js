@@ -2,7 +2,9 @@ function buildSettlementEvent(response, transaction) {
   if (response.status !== "APPROVED") {
     return null;
   }
-
+   if (transaction.transactionType === "BALANCE_INQUIRY") {
+    return null;
+   }
   return {
     transactionId: response.transactionId,
     status: response.status,

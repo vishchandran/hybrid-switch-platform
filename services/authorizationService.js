@@ -16,6 +16,14 @@ function authorizeTransaction(transaction) {
       reason: "ACCOUNT_INACTIVE"
     };
   }
+  if (transaction.transactionType === "BALANCE_INQUIRY") {
+  return {
+    status: "APPROVED",
+    reason: "BALANCE_INQUIRY_APPROVED",
+    accountId: account.accountId,
+    availableBalance: account.availableBalance
+  };
+}
 
   if (transaction.amount > 1000) {
     return {
