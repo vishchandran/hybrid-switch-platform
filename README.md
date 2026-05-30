@@ -99,4 +99,3 @@ node app.js
 ## Purpose
 
 This project was built to better understand payment switch architecture, transaction routing, resiliency patterns, and event-driven processing used in modern payment systems.
-```
