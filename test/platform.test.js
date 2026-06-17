@@ -57,6 +57,39 @@ test("invalid transaction request returns a clear 400 response", async () => {
   });
 });
 
+test("balance inquiry may omit amount", async () => {
+  setNodeStatus("Switch-A", "UP");
+  setNodeStatus("Switch-B", "UP");
+
+  await withServer(async baseUrl => {
+    const transaction = validTransaction({
+      transactionType: "BALANCE_INQUIRY",
+      channel: "ATM"
+    });
+    delete transaction.amount;
+
+    const response = await transactionRequest(baseUrl, transaction);
+    const body = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(body.status, "APPROVED");
+    assert.equal(body.reason, "BALANCE_INQUIRY_APPROVED");
+  });
+});
+
+test("purchase still requires amount", async () => {
+  await withServer(async baseUrl => {
+    const transaction = validTransaction();
+    delete transaction.amount;
+
+    const response = await transactionRequest(baseUrl, transaction);
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.match(body.error, /amount is required/);
+  });
+});
+
 test("transaction IDs are UUID based", async () => {
   setNodeStatus("Switch-A", "UP");
   setNodeStatus("Switch-B", "UP");

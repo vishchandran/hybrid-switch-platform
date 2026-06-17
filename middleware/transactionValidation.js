@@ -21,7 +21,19 @@ function validateTransactionRequest(req, res, next) {
     return res.status(400).json({ error: `Missing required fields: ${missingFields.join(", ")}` });
   }
 
-  if (typeof transaction.amount !== "number" || !Number.isFinite(transaction.amount) || transaction.amount < 0) {
+  const amountProvided = transaction.amount !== undefined;
+  const amountRequired = transaction.transactionType !== "BALANCE_INQUIRY";
+
+  if (amountRequired && !amountProvided) {
+    return res.status(400).json({ error: "amount is required for purchase and cash withdrawal transactions" });
+  }
+
+  if (
+    amountProvided &&
+    (typeof transaction.amount !== "number" ||
+      !Number.isFinite(transaction.amount) ||
+      transaction.amount < 0)
+  ) {
     return res.status(400).json({ error: "amount must be a non-negative number" });
   }
 

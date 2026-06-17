@@ -144,7 +144,7 @@ The next valid transaction returns HTTP `503` with `SYSTEM_UNAVAILABLE` and does
 - UUID-based transaction identifiers replace timestamp-only IDs.
 - Processing fails closed when no switch node is active.
 - Client and admin APIs require separate API-key headers.
-- Transaction requests validate required fields, amounts, PAN shape, transaction types, and channels.
+- Transaction requests validate required fields, amounts, PAN shape, transaction types, and channels. Balance inquiries may omit `amount`; financial transactions require it.
 - Admin node updates allow only known nodes and `UP`/`DOWN` states.
 - JSON request bodies are limited to 10 KB.
 - Transaction and admin routes have simple rate limits.
