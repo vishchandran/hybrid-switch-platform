@@ -1,104 +1,63 @@
 # Hybrid Switch Modernization Platform
 
-A conceptual payment switching simulator that models transaction routing, issuer authorization, resiliency patterns, and event-driven processing commonly used in ATM and POS environments.
+I built this project to explore what happens inside a payment switch after an ATM or POS transaction arrives. It is a small, conceptual simulation rather than a production payment system, so the focus is on making the processing flow easy to read and experiment with.
 
-The project explores how transaction traffic can be processed across multiple switch nodes, routed to issuers, and recovered during outages while maintaining transaction continuity.
+The simulator covers routing, authorization, switch-node failover, issuer timeouts, stand-in decisions, reversals, and downstream events without hiding those ideas behind a large framework or external infrastructure.
 
-It is a learning and portfolio project, not a production payment switch. The implementation favors small, readable modules that make the processing flow easy to follow.
+## What It Demonstrates
 
-## Features
-
-- Purchase transactions
-- ATM cash withdrawals
-- Balance inquiries
-- PIN validation
+- Purchase, cash withdrawal, and balance inquiry requests
+- POS and ATM transaction scenarios
 - BIN-based issuer routing
-- Authorization and decline handling
-- Active-active switch processing
-- Automatic failover
-- Stand-in processing
-- Retry handling
-- Settlement event generation
-- Event-driven downstream processing
+- Simple PIN and account authorization checks
+- Round-robin selection across two active switch nodes
+- Failover when one node is unavailable
+- A fail-closed response when both nodes are unavailable
+- Simulated issuer timeouts, retries, and stand-in processing
+- Authorization, fraud, settlement, reversal, and analytics events
+- Topic mapping and in-process consumer simulation
 
-## Architecture
-
-```text
-Transaction Channel
-        ↓
-Switch Layer
-        ↓
-Issuer Routing
-        ↓
-Authorization
-        ↓
-Event Publishing
-        ↓
-Downstream Services
-```
-
-## Example Flows
-
-### Purchase Transaction
+## How A Transaction Moves Through The Simulator
 
 ```text
-POS Transaction
-      ↓
-Authorization
-      ↓
-Settlement Event
-      ↓
-Analytics Event
+Client request
+    |
+    v
+Request validation and API-key check
+    |
+    v
+Healthy switch-node selection
+    |
+    v
+BIN routing and issuer response simulation
+    |
+    v
+PIN and account authorization
+    |
+    v
+Event publishing and consumer simulation
 ```
 
-### Issuer Outage
+If the selected switch node is down, the other node is used. If neither node is available, processing stops immediately and the API returns `503 SYSTEM_UNAVAILABLE`. The request does not continue into issuer authorization.
 
-```text
-Authorization Request
-      ↓
-Issuer Timeout
-      ↓
-Retry
-      ↓
-Stand-In Processing
-      ↓
-Approve or Decline
-```
+## Run It Locally
 
-### Authorization Reversal
-
-```text
-Authorization Approved
-      ↓
-Processing Failure
-      ↓
-Reversal Generated
-```
-
-## Technology Stack
-
-- Node.js
-- Express
-- REST APIs
-
-## Running Locally
+Install dependencies and start the API:
 
 ```bash
 npm install
 CLIENT_API_KEY=dev-client-key ADMIN_API_KEY=dev-admin-key npm start
 ```
 
-When these environment variables are omitted outside production, the same development-only keys are used by default. Production mode has no fallback keys and requires explicit values.
+The API runs on `http://localhost:3000` by default. For local development, the keys above are also used as fallbacks when the environment variables are omitted. There are no fallback keys when `NODE_ENV=production`.
 
-## Testing
-
-Run the automated checks with:
+Check that the service is running:
 
 ```bash
-npm test
+curl http://localhost:3000/health
 ```
 
-Submit a transaction:
+## Try A Transaction
 
 ```bash
 curl -X POST http://localhost:3000/transactions \
@@ -114,7 +73,13 @@ curl -X POST http://localhost:3000/transactions \
   }'
 ```
 
-Simulate both switch nodes being unavailable:
+The sample card and PIN are test data built into the simulator. A successful response includes a UUID-based transaction ID, the selected switch node, the routed issuer, and the authorization result.
+
+Balance inquiries may omit `amount`. Purchases and cash withdrawals require a non-negative numeric amount.
+
+## Try The Failover Flow
+
+Mark both switch nodes as unavailable:
 
 ```bash
 curl -X POST http://localhost:3000/admin/node-status \
@@ -128,38 +93,56 @@ curl -X POST http://localhost:3000/admin/node-status \
   -d '{"nodeName":"Switch-B","status":"DOWN"}'
 ```
 
-The next valid transaction returns HTTP `503` with `SYSTEM_UNAVAILABLE` and does not continue to issuer authorization.
+The next valid transaction returns HTTP `503` with `SYSTEM_UNAVAILABLE`.
 
-## Intentional Simplifications
+Bring the nodes back after the experiment:
 
-- Transactions, accounts, and node health are stored in memory and reset on restart.
-- Issuer timeout and retry behavior is simulated synchronously.
-- Event topics and consumers are in-process simulations rather than a message broker.
-- PIN validation uses a fixed test value and does not model an HSM or PIN blocks.
-- BIN routing, authorization limits, stand-in rules, reversals, and settlement events are simplified examples.
-- The API-key and rate-limit middleware is intentionally lightweight and process-local.
+```bash
+curl -X POST http://localhost:3000/admin/node-status \
+  -H 'Content-Type: application/json' \
+  -H 'x-admin-api-key: dev-admin-key' \
+  -d '{"nodeName":"Switch-A","status":"UP"}'
 
-## Hardening Added After Review
+curl -X POST http://localhost:3000/admin/node-status \
+  -H 'Content-Type: application/json' \
+  -H 'x-admin-api-key: dev-admin-key' \
+  -d '{"nodeName":"Switch-B","status":"UP"}'
+```
 
-- UUID-based transaction identifiers replace timestamp-only IDs.
-- Processing fails closed when no switch node is active.
-- Client and admin APIs require separate API-key headers.
-- Transaction requests validate required fields, amounts, PAN shape, transaction types, and channels. Balance inquiries may omit `amount`; financial transactions require it.
-- Admin node updates allow only known nodes and `UP`/`DOWN` states.
-- JSON request bodies are limited to 10 KB.
-- Transaction and admin routes have simple rate limits.
-- Automated tests cover authentication, validation, UUIDs, fail-closed behavior, and admin protection.
+## Tests
 
-## Future Enhancements
+```bash
+npm test
+```
 
-- Message broker integration
-- Persistent event storage
-- Dead letter queues
-- Settlement reconciliation
-- Monitoring dashboard
-- Real-time metrics
-- Multi-issuer routing
+The tests exercise API-key protection, request validation, UUID transaction IDs, balance inquiry behavior, admin validation, and the all-nodes-down path.
 
-## Purpose
+## Deliberately Simplified
 
-This project was built to better understand payment switch architecture, transaction routing, resiliency patterns, and event-driven processing used in modern payment systems.
+This repository is meant to explain payment-switch concepts, not reproduce a bank's production environment.
+
+- Transactions, accounts, and node health live in memory and reset when the process restarts.
+- Issuer calls, timeouts, and retries are synchronous simulations.
+- Topics and consumers run in the same process instead of using a message broker.
+- PIN validation uses a fixed test value; there is no HSM or PIN-block handling.
+- BIN ranges, authorization limits, stand-in rules, reversals, and settlement events are small examples.
+- API keys and rate limits are intentionally lightweight and process-local.
+
+These choices keep the full flow understandable from a single repository. A production switch would need durable storage, strong key management, distributed coordination, audited financial state, real issuer integrations, and significantly deeper operational controls.
+
+## Hardening Added During Review
+
+The simulator now includes a few practical safety boundaries without changing its educational shape:
+
+- UUID-based transaction IDs instead of timestamp-only IDs
+- Separate client and admin API keys
+- Validation for transaction fields, amounts, PAN shape, transaction types, and channels
+- A 10 KB JSON request limit
+- Basic transaction and admin rate limits
+- Strict node-name and node-status validation
+- Fail-closed behavior when no switch node is active
+- Automated integration tests for the main request and failure paths
+
+## Possible Next Steps
+
+Natural extensions would be persistent event storage, replay and dead-letter handling, settlement reconciliation, metrics, and a small monitoring view. They are intentionally left out for now so the current project stays focused on the switch flow itself.
