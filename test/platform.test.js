@@ -30,12 +30,18 @@ function validTransaction(overrides = {}) {
   };
 }
 
-function transactionRequest(baseUrl, transaction, apiKey = "test-client-key") {
+function transactionRequest(
+  baseUrl,
+  transaction,
+  apiKey = "test-client-key",
+  idempotencyKey
+) {
   return fetch(`${baseUrl}/transactions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      ...(apiKey ? { "x-api-key": apiKey } : {})
+      ...(apiKey ? { "x-api-key": apiKey } : {}),
+      ...(idempotencyKey ? { "x-idempotency-key": idempotencyKey } : {})
     },
     body: JSON.stringify(transaction)
   });
@@ -83,9 +89,11 @@ test("balance inquiry may omit amount", async () => {
   await withServer(async baseUrl => {
     const transaction = validTransaction({
       transactionType: "BALANCE_INQUIRY",
-      channel: "ATM"
+      channel: "ATM",
+      atmOwnership: "ISSUER_ATM"
     });
     delete transaction.amount;
+    delete transaction.cardEntryMode;
 
     const response = await transactionRequest(baseUrl, transaction);
     const body = await response.json();
@@ -93,6 +101,115 @@ test("balance inquiry may omit amount", async () => {
     assert.equal(response.status, 202);
     assert.equal(body.status, "APPROVED");
     assert.equal(body.reason, "BALANCE_INQUIRY_APPROVED");
+    assert.equal(body.scenario, "ISSUER_ATM");
+  });
+});
+
+test("POS transaction requires cardEntryMode", async () => {
+  await withServer(async baseUrl => {
+    const transaction = validTransaction();
+    delete transaction.cardEntryMode;
+
+    const response = await transactionRequest(baseUrl, transaction);
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.match(body.error, /cardEntryMode must be CHIP or NFC/);
+  });
+});
+
+test("ATM transaction requires atmOwnership", async () => {
+  await withServer(async baseUrl => {
+    const response = await transactionRequest(
+      baseUrl,
+      validTransaction({ channel: "ATM" })
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.match(body.error, /atmOwnership must be ISSUER_ATM or NON_ISSUER_ATM/);
+  });
+});
+
+test("NFC POS transaction resolves to the wallet scenario", async () => {
+  await withServer(async baseUrl => {
+    const response = await transactionRequest(
+      baseUrl,
+      validTransaction({ cardEntryMode: "NFC" })
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(body.scenario, "INTERAC_POS_WALLET");
+  });
+});
+
+test("idempotency duplicate returns the original response", async () => {
+  await withServer(async baseUrl => {
+    const transaction = validTransaction();
+    const key = "duplicate-replay-key";
+    const first = await transactionRequest(
+      baseUrl,
+      transaction,
+      "test-client-key",
+      key
+    );
+    const firstBody = await first.json();
+    const replay = await transactionRequest(
+      baseUrl,
+      transaction,
+      "test-client-key",
+      key
+    );
+    const replayBody = await replay.json();
+
+    assert.equal(replay.status, first.status);
+    assert.equal(replay.headers.get("x-idempotent-replay"), "true");
+    assert.deepEqual(replayBody, firstBody);
+  });
+});
+
+test("idempotency key reuse with a different body returns conflict", async () => {
+  await withServer(async baseUrl => {
+    const key = "duplicate-conflict-key";
+    await transactionRequest(
+      baseUrl,
+      validTransaction(),
+      "test-client-key",
+      key
+    );
+    const conflict = await transactionRequest(
+      baseUrl,
+      validTransaction({ amount: 30 }),
+      "test-client-key",
+      key
+    );
+    const body = await conflict.json();
+
+    assert.equal(conflict.status, 409);
+    assert.equal(body.status, "CONFLICT");
+  });
+});
+
+test("simulateTimeoutAttempts must be an integer between zero and two", async () => {
+  await withServer(async baseUrl => {
+    const response = await transactionRequest(
+      baseUrl,
+      validTransaction({ simulateTimeoutAttempts: 3 })
+    );
+
+    assert.equal(response.status, 400);
+  });
+});
+
+test("simulatePostAuthFailure must be boolean", async () => {
+  await withServer(async baseUrl => {
+    const response = await transactionRequest(
+      baseUrl,
+      validTransaction({ simulatePostAuthFailure: "true" })
+    );
+
+    assert.equal(response.status, 400);
   });
 });
 

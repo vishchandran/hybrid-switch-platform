@@ -63,6 +63,7 @@ curl http://localhost:3000/health
 curl -X POST http://localhost:3000/transactions \
   -H 'Content-Type: application/json' \
   -H 'x-api-key: dev-client-key' \
+  -H 'x-idempotency-key: purchase-demo-001' \
   -d '{
     "transactionType": "PURCHASE",
     "channel": "POS",
@@ -77,6 +78,12 @@ curl -X POST http://localhost:3000/transactions \
 The sample card and PIN are test data built into the simulator. With `cardEntryMode` set to `CHIP`, this request resolves to the `INTERAC_POS_PHYSICAL` scenario. A successful response also includes a UUID-based transaction ID, the selected switch node, the routed issuer, and the authorization result.
 
 Balance inquiries may omit `amount`. Purchases and cash withdrawals require a non-negative numeric amount.
+
+POS requests require `cardEntryMode` set to `CHIP` or `NFC`. ATM requests require `atmOwnership` set to `ISSUER_ATM` or `NON_ISSUER_ATM`.
+
+The optional `x-idempotency-key` header makes retries predictable while the app is running. Reusing a key with the same body returns the original response; reusing it with a different body returns `409 Conflict`. These records are stored in memory and reset when the app restarts.
+
+For failure-flow demonstrations, `simulateTimeoutAttempts` accepts an integer from `0` to `2`, and `simulatePostAuthFailure` accepts a boolean. These fields are simulation controls, not payment-network fields.
 
 ## Try The Failover Flow
 
@@ -116,7 +123,7 @@ curl -X POST http://localhost:3000/admin/node-status \
 npm test
 ```
 
-The tests exercise API-key protection, request validation, UUID transaction IDs, balance inquiry behavior, admin validation, and the all-nodes-down path.
+The tests exercise API-key protection, scenario and simulation validation, in-memory idempotency, UUID transaction IDs, balance inquiry behavior, PIN and stand-in handling, reversal events, admin validation, and the all-nodes-down path.
 
 ## Deliberately Simplified
 
@@ -128,6 +135,7 @@ This repository is meant to explain payment-switch concepts, not reproduce a ban
 - PIN validation uses a fixed test value; there is no HSM or PIN-block handling.
 - BIN ranges, authorization limits, stand-in rules, reversals, and settlement events are small examples.
 - API keys and rate limits are intentionally lightweight and process-local.
+- Idempotency records are also process-local and reset on restart.
 
 These choices keep the full flow understandable from a single repository. A production switch would need durable storage, strong key management, distributed coordination, audited financial state, real issuer integrations, and significantly deeper operational controls.
 
@@ -138,6 +146,8 @@ The simulator now includes a few practical safety boundaries without changing it
 - UUID-based transaction IDs instead of timestamp-only IDs
 - Separate client and admin API keys
 - Validation for transaction fields, amounts, PAN shape, transaction types, and channels
+- Conditional validation for POS entry modes and ATM ownership
+- Lightweight in-memory idempotency for request retries
 - A 10 KB JSON request limit
 - Basic transaction and admin rate limits
 - Strict node-name and node-status validation

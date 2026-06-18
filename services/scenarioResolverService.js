@@ -5,11 +5,15 @@ function resolveScenario(transaction) {
     return "SHARED_ATM_NETWORK";
   }
 
+  if (channel === "ATM" && atmOwnership === "ISSUER_ATM") {
+    return "ISSUER_ATM";
+  }
+
   if (channel === "POS" && cardEntryMode === "CHIP") {
     return "INTERAC_POS_PHYSICAL";
   }
 
-  if (channel === "POS" && cardEntryMode === "NFC_WALLET") {
+  if (channel === "POS" && cardEntryMode === "NFC") {
     return "INTERAC_POS_WALLET";
   }
 
