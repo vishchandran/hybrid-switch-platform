@@ -1,15 +1,31 @@
 const { processTransaction } = require("../services/switchService");
 const { getTransaction } = require("../store/transactionStore");
+const { saveDeadLetter } = require("../store/deadLetterStore");
 
-function createTransaction(req, res) {
-  const result = processTransaction(req.body);
-  const statusCode = result.status === "SYSTEM_UNAVAILABLE" ? 503 : 202;
+async function createTransaction(req, res) {
+  try {
+    const result = await processTransaction(req.body);
+    const statusCode = result.status === "SYSTEM_UNAVAILABLE" ? 503 : 202;
 
-  res.status(statusCode).json(result);
+    return res.status(statusCode).json(result);
+  } catch (error) {
+    await saveDeadLetter({
+      sourceType: "TRANSACTION",
+      sourceId: req.header("x-idempotency-key") || null,
+      reason: error.message,
+      payload: req.body,
+      retryCount: 0
+    });
+
+    return res.status(500).json({
+      status: "FAILED",
+      reason: "TRANSACTION_PROCESSING_FAILED"
+    });
+  }
 }
 
-function getTransactionById(req, res) {
-  const transaction = getTransaction(req.params.id);
+async function getTransactionById(req, res) {
+  const transaction = await getTransaction(req.params.id);
 
   if (!transaction) {
     return res.status(404).json({

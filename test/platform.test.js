@@ -2,6 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { app } = require("../app");
 const { setNodeStatus } = require("../services/nodeHealthService");
+const { publishEvent } = require("../services/eventPublisherService");
+const { listDeadLetters } = require("../store/deadLetterStore");
+const { listOutboxEvents } = require("../store/outboxStore");
 
 process.env.CLIENT_API_KEY = "test-client-key";
 process.env.ADMIN_API_KEY = "test-admin-key";
@@ -242,6 +245,22 @@ test("transaction IDs are UUID based", async () => {
   });
 });
 
+test("approved transaction is persisted and can be retrieved", async () => {
+  await withServer(async baseUrl => {
+    const createResponse = await transactionRequest(baseUrl, validTransaction());
+    const created = await createResponse.json();
+    const getResponse = await fetch(
+      `${baseUrl}/transactions/${created.transactionId}`,
+      { headers: { "x-api-key": "test-client-key" } }
+    );
+    const stored = await getResponse.json();
+
+    assert.equal(createResponse.status, 202);
+    assert.equal(getResponse.status, 200);
+    assert.deepEqual(stored, created);
+  });
+});
+
 test("invalid PIN cannot be stand-in approved after issuer timeout", async () => {
   setNodeStatus("Switch-A", "UP");
   setNodeStatus("Switch-B", "UP");
@@ -314,6 +333,56 @@ test("stand-in approval publishes settlement event", async () => {
       "SETTLEMENT_EVENT",
       "ANALYTICS_EVENT"
     ]);
+  });
+});
+
+test("event publisher stores processed events in the outbox", async () => {
+  const before = await listOutboxEvents();
+  await publishEvent("AUTHORIZATION_EVENT", {
+    transactionId: "TXN-outbox-test",
+    status: "APPROVED"
+  });
+  const after = await listOutboxEvents();
+  const storedEvent = after.find(
+    event =>
+      (event.eventId || event.event_id) &&
+      (event.payload.transactionId || event.payload.transaction_id) === "TXN-outbox-test"
+  );
+
+  assert.equal(after.length, before.length + 1);
+  assert.equal(storedEvent.status, "PROCESSED");
+});
+
+test("failed event is marked failed and copied to the dead-letter table", async () => {
+  const beforeDeadLetters = await listDeadLetters();
+  await publishEvent("ANALYTICS_EVENT", {
+    transactionId: "TXN-dlq-test",
+    simulateConsumerFailure: true
+  });
+  const deadLetters = await listDeadLetters();
+  const failedEvents = (await listOutboxEvents()).filter(
+    event =>
+      event.status === "FAILED" &&
+      (event.payload.transactionId || event.payload.transaction_id) === "TXN-dlq-test"
+  );
+
+  assert.equal(deadLetters.length, beforeDeadLetters.length + 1);
+  assert.equal(failedEvents.length, 1);
+});
+
+test("readiness and metrics endpoints return simulator status", async () => {
+  await withServer(async baseUrl => {
+    await transactionRequest(baseUrl, validTransaction());
+
+    const ready = await fetch(`${baseUrl}/ready`);
+    const metrics = await fetch(`${baseUrl}/metrics`);
+    const body = await metrics.json();
+
+    assert.equal(ready.status, 200);
+    assert.equal(metrics.status, 200);
+    assert(body.totalTransactions >= 1);
+    assert(body.approved >= 1);
+    assert(body.eventCounts.AUTHORIZATION_EVENT.PROCESSED >= 1);
   });
 });
 

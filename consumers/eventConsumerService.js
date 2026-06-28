@@ -1,4 +1,8 @@
 function consumeEvent(topic, eventType, payload) {
+  if (payload && payload.simulateConsumerFailure === true) {
+    throw new Error("SIMULATED_CONSUMER_FAILURE");
+  }
+
   if (topic === "fraud-events") {
     console.log(
       `[CONSUMER] Fraud Consumer processed ${payload.transactionId}`

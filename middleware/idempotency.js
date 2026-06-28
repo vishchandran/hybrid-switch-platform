@@ -1,4 +1,8 @@
-const idempotencyRecords = new Map();
+const crypto = require("crypto");
+const {
+  getIdempotencyRecord,
+  saveIdempotencyRecord
+} = require("../store/idempotencyStore");
 
 function sortValue(value) {
   if (Array.isArray(value)) {
@@ -17,22 +21,25 @@ function sortValue(value) {
   return value;
 }
 
-function requestSignature(body) {
-  return JSON.stringify(sortValue(body));
+function requestHash(body) {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(sortValue(body)))
+    .digest("hex");
 }
 
-function idempotency(req, res, next) {
+async function idempotency(req, res, next) {
   const key = req.header("x-idempotency-key");
 
   if (!key) {
     return next();
   }
 
-  const signature = requestSignature(req.body);
-  const existing = idempotencyRecords.get(key);
+  const hash = requestHash(req.body);
+  const existing = await getIdempotencyRecord(key);
 
   if (existing) {
-    if (existing.signature !== signature) {
+    if (existing.requestHash !== hash) {
       return res.status(409).json({
         status: "CONFLICT",
         reason: "Idempotency key already used with a different request body"
@@ -40,15 +47,15 @@ function idempotency(req, res, next) {
     }
 
     res.set("x-idempotent-replay", "true");
-    return res.status(existing.statusCode).json(existing.body);
+    return res.status(existing.statusCode).json(existing.response);
   }
 
   const sendJson = res.json.bind(res);
-  res.json = body => {
-    idempotencyRecords.set(key, {
-      signature,
+  res.json = async body => {
+    await saveIdempotencyRecord(key, {
+      requestHash: hash,
       statusCode: res.statusCode,
-      body
+      response: body
     });
     return sendJson(body);
   };
@@ -56,4 +63,4 @@ function idempotency(req, res, next) {
   return next();
 }
 
-module.exports = { idempotency };
+module.exports = { idempotency, requestHash };

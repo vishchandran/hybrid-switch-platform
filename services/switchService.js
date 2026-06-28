@@ -13,12 +13,12 @@ const { buildFraudEvent } = require("./fraudEventService");
 const { buildSettlementEvent } = require("./settlementEventService");
 const { buildAnalyticsEvent } = require("./analyticsEventService");
 
-function publishAuthorizationAndAnalytics(response, transaction) {
-  publishEvent("AUTHORIZATION_EVENT", response);
-  publishEvent("ANALYTICS_EVENT", buildAnalyticsEvent(response, transaction));
+async function publishAuthorizationAndAnalytics(response, transaction) {
+  await publishEvent("AUTHORIZATION_EVENT", response);
+  await publishEvent("ANALYTICS_EVENT", buildAnalyticsEvent(response, transaction));
 }
 
-function processTransaction(transaction) {
+async function processTransaction(transaction) {
   const transactionId = `TXN-${crypto.randomUUID()}`;
   const switchNode = selectSwitchNode();
   const scenario = resolveScenario(transaction);
@@ -36,8 +36,8 @@ function processTransaction(transaction) {
       issuerRouting
     };
 
-    saveTransaction(response);
-    publishAuthorizationAndAnalytics(response, transaction);
+    await saveTransaction(response);
+    await publishAuthorizationAndAnalytics(response, transaction);
     return response;
   }
 
@@ -56,8 +56,8 @@ function processTransaction(transaction) {
       pinValid
     };
 
-    saveTransaction(response);
-    publishAuthorizationAndAnalytics(response, transaction);
+    await saveTransaction(response);
+    await publishAuthorizationAndAnalytics(response, transaction);
     return response;
   }
 
@@ -77,19 +77,19 @@ function processTransaction(transaction) {
       pinValid
     };
 
-    saveTransaction(response);
-    publishEvent("AUTHORIZATION_EVENT", response);
+    await saveTransaction(response);
+    await publishEvent("AUTHORIZATION_EVENT", response);
 
     if (response.status === "APPROVED") {
-      publishEvent("FRAUD_EVENT", buildFraudEvent(response, transaction));
+      await publishEvent("FRAUD_EVENT", buildFraudEvent(response, transaction));
 
       const settlementEvent = buildSettlementEvent(response, transaction);
       if (settlementEvent) {
-        publishEvent("SETTLEMENT_EVENT", settlementEvent);
+        await publishEvent("SETTLEMENT_EVENT", settlementEvent);
       }
     }
 
-    publishEvent("ANALYTICS_EVENT", buildAnalyticsEvent(response, transaction));
+    await publishEvent("ANALYTICS_EVENT", buildAnalyticsEvent(response, transaction));
     return response;
   }
 
@@ -114,19 +114,19 @@ function processTransaction(transaction) {
     : buildSettlementEvent(response, transaction);
   const analyticsEvent = buildAnalyticsEvent(response, transaction);
 
-  saveTransaction(response);
-  publishEvent("AUTHORIZATION_EVENT", response);
-  publishEvent("FRAUD_EVENT", fraudEvent);
+  await saveTransaction(response);
+  await publishEvent("AUTHORIZATION_EVENT", response);
+  await publishEvent("FRAUD_EVENT", fraudEvent);
 
   if (settlementEvent) {
-    publishEvent("SETTLEMENT_EVENT", settlementEvent);
+    await publishEvent("SETTLEMENT_EVENT", settlementEvent);
   }
 
   if (reversalEvent) {
-    publishEvent("REVERSAL_EVENT", reversalEvent);
+    await publishEvent("REVERSAL_EVENT", reversalEvent);
   }
 
-  publishEvent("ANALYTICS_EVENT", analyticsEvent);
+  await publishEvent("ANALYTICS_EVENT", analyticsEvent);
   return response;
 }
 
