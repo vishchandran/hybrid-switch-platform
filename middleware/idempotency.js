@@ -32,7 +32,21 @@ async function idempotency(req, res, next) {
   const key = req.header("x-idempotency-key");
 
   if (!key) {
+    if (process.env.NODE_ENV === "production") {
+      return res.status(400).json({
+        status: "REJECTED",
+        reason: "x-idempotency-key is required in production"
+      });
+    }
+
     return next();
+  }
+
+  if (key.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(key)) {
+    return res.status(400).json({
+      status: "REJECTED",
+      reason: "x-idempotency-key must be 128 characters or fewer and contain only letters, numbers, dots, underscores, colons, or hyphens"
+    });
   }
 
   const hash = requestHash(req.body);

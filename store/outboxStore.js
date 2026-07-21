@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { isDatabaseConfigured, query } = require("../db/postgres");
+const { sanitizeText } = require("../utils/sensitiveData");
 
 const outboxEvents = [];
 
@@ -67,7 +68,7 @@ async function markOutboxFailed(eventId, error) {
            failed_at = NOW(),
            last_error = $2
        WHERE event_id = $1`,
-      [eventId, error.message]
+      [eventId, sanitizeText(error.message)]
     );
     return;
   }
@@ -77,7 +78,7 @@ async function markOutboxFailed(eventId, error) {
     event.status = "FAILED";
     event.retryCount += 1;
     event.failedAt = new Date().toISOString();
-    event.lastError = error.message;
+    event.lastError = sanitizeText(error.message);
   }
 }
 

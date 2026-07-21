@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { isDatabaseConfigured, query } = require("../db/postgres");
+const { removeSensitiveFields, sanitizeText } = require("../utils/sensitiveData");
 
 const deadLetters = [];
 
@@ -8,8 +9,8 @@ async function saveDeadLetter({ sourceType, sourceId, reason, payload, retryCoun
     id: `DLQ-${crypto.randomUUID()}`,
     sourceType,
     sourceId,
-    reason,
-    payload,
+    reason: sanitizeText(reason),
+    payload: removeSensitiveFields(payload),
     retryCount,
     createdAt: new Date().toISOString()
   };

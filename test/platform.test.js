@@ -5,6 +5,8 @@ const { setNodeStatus } = require("../services/nodeHealthService");
 const { publishEvent } = require("../services/eventPublisherService");
 const { listDeadLetters } = require("../store/deadLetterStore");
 const { listOutboxEvents } = require("../store/outboxStore");
+const { validateProductionConfig } = require("../config/runtimeConfig");
+const { removeSensitiveFields, sanitizeText } = require("../utils/sensitiveData");
 
 process.env.CLIENT_API_KEY = "test-client-key";
 process.env.ADMIN_API_KEY = "test-admin-key";
@@ -191,6 +193,21 @@ test("idempotency key reuse with a different body returns conflict", async () =>
 
     assert.equal(conflict.status, 409);
     assert.equal(body.status, "CONFLICT");
+  });
+});
+
+test("invalid idempotency key format returns 400", async () => {
+  await withServer(async baseUrl => {
+    const response = await transactionRequest(
+      baseUrl,
+      validTransaction(),
+      "test-client-key",
+      "bad key with spaces"
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(body.status, "REJECTED");
   });
 });
 
@@ -386,10 +403,14 @@ test("readiness and metrics endpoints return simulator status", async () => {
     await transactionRequest(baseUrl, validTransaction());
 
     const ready = await fetch(`${baseUrl}/ready`);
-    const metrics = await fetch(`${baseUrl}/metrics`);
+    const unauthorizedMetrics = await fetch(`${baseUrl}/metrics`);
+    const metrics = await fetch(`${baseUrl}/metrics`, {
+      headers: { "x-admin-api-key": "test-admin-key" }
+    });
     const body = await metrics.json();
 
     assert.equal(ready.status, 200);
+    assert.equal(unauthorizedMetrics.status, 401);
     assert.equal(metrics.status, 200);
     assert(body.totalTransactions >= 1);
     assert(body.approved >= 1);
@@ -397,6 +418,44 @@ test("readiness and metrics endpoints return simulator status", async () => {
     assert(body.failedEventCount >= 1);
     assert(body.eventCounts.AUTHORIZATION_EVENT.PROCESSED >= 1);
   });
+});
+
+test("production configuration fails closed without durable dependencies and real keys", () => {
+  assert.throws(
+    () => validateProductionConfig({ NODE_ENV: "production" }),
+    /CLIENT_API_KEY, ADMIN_API_KEY, DATABASE_URL, ALLOWED_ORIGINS/
+  );
+
+  assert.throws(
+    () =>
+      validateProductionConfig({
+        NODE_ENV: "production",
+        CLIENT_API_KEY: "dev-client-key",
+        ADMIN_API_KEY: "real-admin-key",
+        DATABASE_URL: "postgres://example",
+        ALLOWED_ORIGINS: "https://example.com"
+      }),
+    /development default/
+  );
+});
+
+test("sensitive fields are removed from operational payloads and error text", () => {
+  const payload = removeSensitiveFields({
+    cardNumber: "4000011234567890",
+    pin: "1234",
+    nested: {
+      cardNumber: "4000019999999999"
+    },
+    amount: 25
+  });
+  const text = sanitizeText("failed cardNumber=4000011234567890 pin=1234");
+
+  assert.deepEqual(payload, {
+    nested: {},
+    amount: 25
+  });
+  assert(!text.includes("4000011234567890"));
+  assert(!text.includes("1234"));
 });
 
 test("processing fails closed when both switch nodes are down", async () => {

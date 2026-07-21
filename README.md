@@ -93,8 +93,24 @@ curl http://localhost:3000/ready
 Simple simulator metrics are available as JSON:
 
 ```bash
-curl http://localhost:3000/metrics
+curl http://localhost:3000/metrics \
+  -H 'x-admin-api-key: dev-admin-key'
 ```
+
+## Production Mode Guardrails
+
+This project is still a simulator, but production mode now fails closed on the basics instead of silently using demo behavior.
+
+When `NODE_ENV=production`, startup requires:
+
+```text
+CLIENT_API_KEY
+ADMIN_API_KEY
+DATABASE_URL
+ALLOWED_ORIGINS
+```
+
+The development API keys are rejected in production, `/ready` requires a working database connection, `/metrics` requires the admin API key, and transaction requests require a bounded `x-idempotency-key`. CORS is restricted to the comma-separated `ALLOWED_ORIGINS` list.
 
 ## Try A Transaction
 
@@ -121,6 +137,8 @@ Balance inquiries may omit `amount`. Purchases and cash withdrawals require a no
 POS requests require `cardEntryMode` set to `CHIP` or `NFC`. ATM requests require `atmOwnership` set to `ISSUER_ATM` or `NON_ISSUER_ATM`.
 
 The optional `x-idempotency-key` header makes retries predictable. The simulator claims an idempotency key before processing starts, then completes the record with the response. Reusing a completed key with the same body returns the original response; reusing it with a different body returns `409 Conflict`; reusing it while the original request is still processing also returns `409 Conflict`. When `DATABASE_URL` is configured, idempotency records are persisted in PostgreSQL. Without PostgreSQL, they use the local in-memory fallback and reset when the app restarts.
+
+In production mode, `x-idempotency-key` is required.
 
 For failure-flow demonstrations, `simulateTimeoutAttempts` accepts an integer from `0` to `2`, and `simulatePostAuthFailure` accepts a boolean. These fields are simulation controls, not payment-network fields.
 
@@ -175,6 +193,7 @@ This repository is meant to explain payment-switch concepts, not reproduce a ban
 - PIN validation uses a fixed test value; there is no HSM or PIN-block handling.
 - BIN ranges, authorization limits, stand-in rules, reversals, and settlement events are small examples.
 - API keys and rate limits are intentionally lightweight and process-local.
+- The development fallback stores and API keys are disabled by production startup checks.
 
 These choices keep the full flow understandable from a single repository. The PostgreSQL/outbox additions make the simulator more realistic, but they do not make it a production payment switch.
 
@@ -184,6 +203,7 @@ The simulator now includes a few practical safety boundaries without changing it
 
 - UUID-based transaction IDs instead of timestamp-only IDs
 - Separate client and admin API keys
+- Production startup validation for real API keys, PostgreSQL, and explicit CORS origins
 - Validation for transaction fields, amounts, PAN shape, transaction types, and channels
 - Conditional validation for POS entry modes and ATM ownership
 - Lightweight idempotency for request retries
@@ -193,6 +213,9 @@ The simulator now includes a few practical safety boundaries without changing it
 - Separate outbox processor function so the event lifecycle is easier to learn
 - Transaction lifecycle states in API responses
 - Basic readiness and metrics endpoints
+- Admin-protected metrics endpoint
+- Graceful shutdown for the API server and PostgreSQL pool
+- Sanitized dead-letter payloads and operational error text
 - A 10 KB JSON request limit
 - Basic transaction and admin rate limits
 - Strict node-name and node-status validation
@@ -211,6 +234,7 @@ This project should still be described as a simulator. The new persistence and o
 - No production monitoring stack, tracing, alerting, dashboards, or runbooks
 - No formal migration runner; the simulator applies a small schema automatically
 - No secret rotation, audit-grade admin controls, or hardened deployment model
+- No production-grade rate limiter shared across multiple instances
 
 ## Possible Next Steps
 

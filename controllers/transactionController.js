@@ -1,6 +1,7 @@
 const { processTransaction } = require("../services/switchService");
 const { getTransaction } = require("../store/transactionStore");
 const { saveDeadLetter } = require("../store/deadLetterStore");
+const { removeSensitiveFields, sanitizeText } = require("../utils/sensitiveData");
 
 async function createTransaction(req, res) {
   try {
@@ -12,8 +13,8 @@ async function createTransaction(req, res) {
     await saveDeadLetter({
       sourceType: "TRANSACTION",
       sourceId: req.header("x-idempotency-key") || null,
-      reason: error.message,
-      payload: req.body,
+      reason: sanitizeText(error.message),
+      payload: removeSensitiveFields(req.body),
       retryCount: 0
     });
 

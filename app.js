@@ -5,7 +5,11 @@ const transactionRoutes = require("./routes/transactionRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { clientApiKeyAuth, adminApiKeyAuth } = require("./middleware/apiKeyAuth");
 const { createRateLimiter } = require("./middleware/rateLimiter");
-const { checkDatabase } = require("./db/postgres");
+const { checkDatabase, closeDatabase } = require("./db/postgres");
+const {
+  buildCorsOptions,
+  validateProductionConfig
+} = require("./config/runtimeConfig");
 const { getTransactionMetrics } = require("./store/transactionStore");
 const { getEventMetrics } = require("./store/outboxStore");
 const { getDeadLetterMetrics } = require("./store/deadLetterStore");
@@ -14,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
-app.use(cors());
+app.use(cors(buildCorsOptions()));
 app.use(express.json({ limit: "10kb" }));
 
 app.get("/health", (req, res) => {
@@ -28,7 +32,10 @@ app.get("/health", (req, res) => {
 
 app.get("/ready", async (req, res) => {
   const database = await checkDatabase();
-  const ready = !database.configured || database.connected;
+  const ready =
+    process.env.NODE_ENV === "production"
+      ? database.configured && database.connected
+      : !database.configured || database.connected;
 
   res.status(ready ? 200 : 503).json({
     status: ready ? "READY" : "NOT_READY",
@@ -36,7 +43,7 @@ app.get("/ready", async (req, res) => {
   });
 });
 
-app.get("/metrics", async (req, res) => {
+app.get("/metrics", adminApiKeyAuth, async (req, res) => {
   const transactionMetrics = await getTransactionMetrics();
   const eventRows = await getEventMetrics();
   const deadLetterMetrics = await getDeadLetterMetrics();
@@ -81,10 +88,62 @@ app.use(
   adminRoutes
 );
 
-if (require.main === module) {
-  app.listen(PORT, () => {
+app.use((error, req, res, next) => {
+  if (error && error.type === "entity.too.large") {
+    return res.status(413).json({
+      status: "PAYLOAD_TOO_LARGE",
+      reason: "Request body exceeds the 10 KB limit"
+    });
+  }
+
+  if (error && error.message === "CORS origin not allowed") {
+    return res.status(403).json({
+      status: "FORBIDDEN",
+      reason: "CORS origin not allowed"
+    });
+  }
+
+  console.error("UNHANDLED_REQUEST_ERROR:", error.message);
+  return res.status(500).json({
+    status: "ERROR",
+    reason: "Internal server error"
+  });
+});
+
+function startServer() {
+  validateProductionConfig();
+
+  const server = app.listen(PORT, () => {
     console.log(`HSMP running on port ${PORT}`);
   });
+
+  async function shutdown(signal) {
+    console.log(`HSMP shutdown started: ${signal}`);
+    server.close(async error => {
+      if (error) {
+        console.error("HSMP server close failed:", error.message);
+        process.exit(1);
+      }
+
+      try {
+        await closeDatabase();
+        console.log("HSMP shutdown complete");
+        process.exit(0);
+      } catch (closeError) {
+        console.error("HSMP database close failed:", closeError.message);
+        process.exit(1);
+      }
+    });
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
+  return server;
 }
 
-module.exports = { app };
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, startServer };
