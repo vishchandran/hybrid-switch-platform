@@ -5,8 +5,11 @@ const { setNodeStatus } = require("../services/nodeHealthService");
 const { publishEvent } = require("../services/eventPublisherService");
 const { listDeadLetters } = require("../store/deadLetterStore");
 const { listOutboxEvents } = require("../store/outboxStore");
+const { listReconciliationRecords } = require("../store/reconciliationStore");
 const { validateProductionConfig } = require("../config/runtimeConfig");
 const { removeSensitiveFields, sanitizeText } = require("../utils/sensitiveData");
+const { getBrokerMode } = require("../services/brokerService");
+const { getRedisConnectionOptions } = require("../broker/bullmqConnection");
 
 process.env.CLIENT_API_KEY = "test-client-key";
 process.env.ADMIN_API_KEY = "test-admin-key";
@@ -275,6 +278,9 @@ test("approved transaction is persisted and can be retrieved", async () => {
     assert.equal(createResponse.status, 202);
     assert.equal(getResponse.status, 200);
     assert.deepEqual(stored, created);
+    assert.equal(stored.iso8583.mti, "0100");
+    assert.equal(stored.iso8583.responseMti, "0110");
+    assert.equal(stored.iso8583.responseCode, "00");
     assert.deepEqual(
       stored.lifecycle.map(step => step.state),
       [
@@ -340,6 +346,22 @@ test("reversal scenario suppresses settlement event", async () => {
     assert.equal(body.status, "APPROVED");
     assert(eventTypes.includes("REVERSAL_EVENT"));
     assert(!eventTypes.includes("SETTLEMENT_EVENT"));
+  });
+});
+
+test("approved settlement creates a reconciliation record", async () => {
+  const before = await listReconciliationRecords();
+
+  await withServer(async baseUrl => {
+    const response = await transactionRequest(baseUrl, validTransaction());
+    const body = await response.json();
+    const after = await listReconciliationRecords();
+    const record = after.find(item => item.transactionId === body.transactionId);
+
+    assert.equal(response.status, 202);
+    assert.equal(after.length, before.length + 1);
+    assert.equal(record.recordType, "SETTLEMENT");
+    assert.equal(record.status, "PENDING_RECONCILIATION");
   });
 });
 
@@ -417,13 +439,16 @@ test("readiness and metrics endpoints return simulator status", async () => {
     assert(body.deadLetterCount >= 1);
     assert(body.failedEventCount >= 1);
     assert(body.eventCounts.AUTHORIZATION_EVENT.PROCESSED >= 1);
+    assert.equal(body.brokerMode, getBrokerMode());
+    assert.equal(body.pinSecurityMode, "SIMULATED_PIN");
+    assert(body.reconciliationCounts.SETTLEMENT.PENDING_RECONCILIATION >= 1);
   });
 });
 
 test("production configuration fails closed without durable dependencies and real keys", () => {
   assert.throws(
     () => validateProductionConfig({ NODE_ENV: "production" }),
-    /CLIENT_API_KEY, ADMIN_API_KEY, DATABASE_URL, ALLOWED_ORIGINS/
+    /CLIENT_API_KEY, ADMIN_API_KEY, DATABASE_URL, ALLOWED_ORIGINS, BROKER_MODE, PIN_SECURITY_MODE, HSM_ENDPOINT/
   );
 
   assert.throws(
@@ -433,10 +458,54 @@ test("production configuration fails closed without durable dependencies and rea
         CLIENT_API_KEY: "dev-client-key",
         ADMIN_API_KEY: "real-admin-key",
         DATABASE_URL: "postgres://example",
-        ALLOWED_ORIGINS: "https://example.com"
+        ALLOWED_ORIGINS: "https://example.com",
+        BROKER_MODE: "BULLMQ",
+        REDIS_URL: "redis://localhost:6379",
+        PIN_SECURITY_MODE: "EXTERNAL_HSM",
+        HSM_ENDPOINT: "https://hsm.example"
       }),
     /development default/
   );
+
+  assert.throws(
+    () =>
+      validateProductionConfig({
+        NODE_ENV: "production",
+        CLIENT_API_KEY: "real-client-key",
+        ADMIN_API_KEY: "real-admin-key",
+        DATABASE_URL: "postgres://example",
+        ALLOWED_ORIGINS: "https://example.com",
+        BROKER_MODE: "BULLMQ",
+        REDIS_URL: "redis://localhost:6379",
+        PIN_SECURITY_MODE: "SIMULATED_PIN",
+        HSM_ENDPOINT: "https://hsm.example"
+      }),
+    /EXTERNAL_HSM/
+  );
+
+  assert.throws(
+    () =>
+      validateProductionConfig({
+        NODE_ENV: "production",
+        CLIENT_API_KEY: "real-client-key",
+        ADMIN_API_KEY: "real-admin-key",
+        DATABASE_URL: "postgres://example",
+        ALLOWED_ORIGINS: "https://example.com",
+        BROKER_MODE: "IN_PROCESS_SIMULATED",
+        PIN_SECURITY_MODE: "EXTERNAL_HSM",
+        HSM_ENDPOINT: "https://hsm.example"
+      }),
+    /BULLMQ/
+  );
+});
+
+test("BullMQ broker connection options support Redis URL configuration", () => {
+  const options = getRedisConnectionOptions({
+    REDIS_URL: "redis://localhost:6379"
+  });
+
+  assert.equal(options.connectionString, "redis://localhost:6379");
+  assert.equal(options.maxRetriesPerRequest, null);
 });
 
 test("sensitive fields are removed from operational payloads and error text", () => {

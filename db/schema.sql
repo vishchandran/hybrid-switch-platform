@@ -51,3 +51,13 @@ CREATE TABLE IF NOT EXISTS dead_letter (
   retry_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS reconciliation_records (
+  id TEXT PRIMARY KEY,
+  transaction_id TEXT NOT NULL,
+  record_type TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

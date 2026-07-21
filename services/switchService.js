@@ -12,6 +12,8 @@ const { saveTransaction } = require("../store/transactionStore");
 const { buildFraudEvent } = require("./fraudEventService");
 const { buildSettlementEvent } = require("./settlementEventService");
 const { buildAnalyticsEvent } = require("./analyticsEventService");
+const { buildIso8583Summary } = require("./iso8583MessageService");
+const { saveReconciliationRecord } = require("../store/reconciliationStore");
 const {
   addLifecycleState,
   createLifecycle
@@ -44,6 +46,7 @@ async function processTransaction(transaction) {
       issuerRouting,
       lifecycle
     };
+    response.iso8583 = buildIso8583Summary(transaction, response);
 
     await saveTransaction(response);
     await publishAuthorizationAndAnalytics(response, transaction);
@@ -67,6 +70,7 @@ async function processTransaction(transaction) {
       pinValid,
       lifecycle
     };
+    response.iso8583 = buildIso8583Summary(transaction, response);
 
     await saveTransaction(response);
     await publishAuthorizationAndAnalytics(response, transaction);
@@ -95,6 +99,7 @@ async function processTransaction(transaction) {
       pinValid,
       lifecycle
     };
+    response.iso8583 = buildIso8583Summary(transaction, response);
 
     await saveTransaction(response);
     await publishEvent("AUTHORIZATION_EVENT", response);
@@ -104,6 +109,13 @@ async function processTransaction(transaction) {
 
       const settlementEvent = buildSettlementEvent(response, transaction);
       if (settlementEvent) {
+        await saveReconciliationRecord({
+          transactionId,
+          recordType: "SETTLEMENT",
+          amount: transaction.amount,
+          status: "PENDING_RECONCILIATION",
+          payload: settlementEvent
+        });
         await publishEvent("SETTLEMENT_EVENT", settlementEvent);
       }
     }
@@ -127,6 +139,7 @@ async function processTransaction(transaction) {
     pinValid,
     lifecycle
   };
+  response.iso8583 = buildIso8583Summary(transaction, response);
 
   const fraudEvent = buildFraudEvent(response, transaction);
   const reversalEvent = buildReversalEvent(response, transaction);
@@ -143,10 +156,24 @@ async function processTransaction(transaction) {
   await publishEvent("FRAUD_EVENT", fraudEvent);
 
   if (settlementEvent) {
+    await saveReconciliationRecord({
+      transactionId,
+      recordType: "SETTLEMENT",
+      amount: transaction.amount,
+      status: "PENDING_RECONCILIATION",
+      payload: settlementEvent
+    });
     await publishEvent("SETTLEMENT_EVENT", settlementEvent);
   }
 
   if (reversalEvent) {
+    await saveReconciliationRecord({
+      transactionId,
+      recordType: "REVERSAL",
+      amount: transaction.amount,
+      status: "PENDING_RECONCILIATION",
+      payload: reversalEvent
+    });
     await publishEvent("REVERSAL_EVENT", reversalEvent);
   }
 

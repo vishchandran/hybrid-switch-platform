@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
+    "event-worker": "node eventWorker.js",
     "migrate": "node db/migrate.js",
     "test": "node --test"
   },
@@ -14,9 +15,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "bullmq": "^5.80.9",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
+    "ioredis": "^5.11.1",
     "pg": "^8.22.0"
   },
   "devDependencies": {

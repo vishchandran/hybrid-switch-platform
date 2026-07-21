@@ -2,7 +2,10 @@ const REQUIRED_PRODUCTION_ENV = [
   "CLIENT_API_KEY",
   "ADMIN_API_KEY",
   "DATABASE_URL",
-  "ALLOWED_ORIGINS"
+  "ALLOWED_ORIGINS",
+  "BROKER_MODE",
+  "PIN_SECURITY_MODE",
+  "HSM_ENDPOINT"
 ];
 
 function validateProductionConfig(env = process.env) {
@@ -24,6 +27,18 @@ function validateProductionConfig(env = process.env) {
 
   if (env.ADMIN_API_KEY === "dev-admin-key") {
     throw new Error("ADMIN_API_KEY must not use the development default in production");
+  }
+
+  if (env.PIN_SECURITY_MODE !== "EXTERNAL_HSM") {
+    throw new Error("PIN_SECURITY_MODE must be EXTERNAL_HSM in production");
+  }
+
+  if (env.BROKER_MODE !== "BULLMQ") {
+    throw new Error("BROKER_MODE must be BULLMQ in production");
+  }
+
+  if (!env.REDIS_URL && !env.REDIS_HOST) {
+    throw new Error("REDIS_URL or REDIS_HOST must be set when BROKER_MODE=BULLMQ in production");
   }
 }
 

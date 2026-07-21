@@ -6,6 +6,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const { clientApiKeyAuth, adminApiKeyAuth } = require("./middleware/apiKeyAuth");
 const { createRateLimiter } = require("./middleware/rateLimiter");
 const { checkDatabase, closeDatabase } = require("./db/postgres");
+const { closeBroker } = require("./broker/bullmqConnection");
 const {
   buildCorsOptions,
   validateProductionConfig
@@ -13,6 +14,9 @@ const {
 const { getTransactionMetrics } = require("./store/transactionStore");
 const { getEventMetrics } = require("./store/outboxStore");
 const { getDeadLetterMetrics } = require("./store/deadLetterStore");
+const { getReconciliationMetrics } = require("./store/reconciliationStore");
+const { getBrokerMode } = require("./services/brokerService");
+const { getPinSecurityMode } = require("./services/pinSecurityService");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +51,7 @@ app.get("/metrics", adminApiKeyAuth, async (req, res) => {
   const transactionMetrics = await getTransactionMetrics();
   const eventRows = await getEventMetrics();
   const deadLetterMetrics = await getDeadLetterMetrics();
+  const reconciliationRows = await getReconciliationMetrics();
 
   const eventCounts = eventRows.reduce((counts, row) => {
     const eventType = row.event_type;
@@ -55,8 +60,17 @@ app.get("/metrics", adminApiKeyAuth, async (req, res) => {
     counts[eventType][status] = (counts[eventType][status] || 0) + Number(row.count);
     return counts;
   }, {});
+  const reconciliationCounts = reconciliationRows.reduce((counts, row) => {
+    const recordType = row.record_type;
+    const status = row.status;
+    counts[recordType] = counts[recordType] || {};
+    counts[recordType][status] = (counts[recordType][status] || 0) + Number(row.count);
+    return counts;
+  }, {});
 
   res.status(200).json({
+    brokerMode: getBrokerMode(),
+    pinSecurityMode: getPinSecurityMode(),
     totalTransactions: Number(transactionMetrics.total_transactions || 0),
     approved: Number(transactionMetrics.approved || 0),
     declined: Number(transactionMetrics.declined || 0),
@@ -71,7 +85,8 @@ app.get("/metrics", adminApiKeyAuth, async (req, res) => {
       0
     ),
     deadLetterCount: Number(deadLetterMetrics.total || 0),
-    eventCounts
+    eventCounts,
+    reconciliationCounts
   });
 });
 
@@ -126,6 +141,7 @@ function startServer() {
       }
 
       try {
+        await closeBroker();
         await closeDatabase();
         console.log("HSMP shutdown complete");
         process.exit(0);
