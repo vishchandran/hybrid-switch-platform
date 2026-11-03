@@ -1,22 +1,16 @@
-function buildSettlementEvent(response, transaction) {
-  if (response.status !== "APPROVED") {
-    return null;
-  }
-   if (transaction.transactionType === "BALANCE_INQUIRY") {
-    return null;
-   }
+function buildAnalyticsEvent(response, transaction) {
   return {
     transactionId: response.transactionId,
     status: response.status,
+    reason: response.reason,
     amount: transaction.amount,
     network: response.network,
     channel: response.channel,
     scenario: response.scenario,
     routedIssuer: response.issuerRouting.routedIssuer,
-    settlementRequired: true
+    transactionType: transaction.transactionType,
+    cardEntryMode: transaction.cardEntryMode
   };
 }
 
-module.exports = {
-  buildSettlementEvent
-};
+module.exports = { buildAnalyticsEvent };

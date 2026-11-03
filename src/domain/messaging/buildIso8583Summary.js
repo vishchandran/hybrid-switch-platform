@@ -1,14 +1,5 @@
-const PROCESSING_CODES = {
-  PURCHASE: "000000",
-  CASH_WITHDRAWAL: "010000",
-  BALANCE_INQUIRY: "310000"
-};
-
-const RESPONSE_CODES = {
-  APPROVED: "00",
-  DECLINED: "05",
-  SYSTEM_UNAVAILABLE: "91"
-};
+const PROCESSING_CODES = { PURCHASE: "000000", CASH_WITHDRAWAL: "010000", BALANCE_INQUIRY: "310000" };
+const RESPONSE_CODES = { APPROVED: "00", DECLINED: "05", SYSTEM_UNAVAILABLE: "91" };
 
 function buildIso8583Summary(transaction, response) {
   return {
@@ -23,6 +14,4 @@ function buildIso8583Summary(transaction, response) {
   };
 }
 
-module.exports = {
-  buildIso8583Summary
-};
+module.exports = { buildIso8583Summary };

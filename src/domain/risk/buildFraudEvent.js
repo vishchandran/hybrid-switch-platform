@@ -10,6 +10,4 @@ function buildFraudEvent(response, transaction) {
   };
 }
 
-module.exports = {
-  buildFraudEvent
-};
+module.exports = { buildFraudEvent };
