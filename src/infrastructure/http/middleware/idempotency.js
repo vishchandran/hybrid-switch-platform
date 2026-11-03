@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const {
   claimIdempotencyKey,
   completeIdempotencyRecord
-} = require("../../../../store/idempotencyStore");
+} = require("../../persistence/idempotencyRepository");
 
 function sortValue(value) {
   if (Array.isArray(value)) {

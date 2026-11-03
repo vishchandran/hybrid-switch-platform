@@ -1,10 +1,10 @@
-const { publishToBroker } = require("./brokerService");
+const { publishToBroker } = require("./brokerPublisher");
 const {
   markOutboxFailed,
   markOutboxProcessed
-} = require("../store/outboxStore");
-const { saveDeadLetter } = require("../store/deadLetterStore");
-const { withDistributedLock } = require("../store/distributedLockStore");
+} = require("../persistence/outboxRepository");
+const { saveDeadLetter } = require("../persistence/deadLetterRepository");
+const { withDistributedLock } = require("../persistence/distributedLock");
 
 async function processOutboxEvent(storedEvent) {
   return withDistributedLock(`outbox:${storedEvent.eventId}`, async () => {

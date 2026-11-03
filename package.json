@@ -2,12 +2,12 @@
   "name": "hybrid-switch-platform",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "src/main/app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "event-worker": "node eventWorker.js",
-    "migrate": "node db/migrate.js",
+    "start": "node src/main/app.js",
+    "dev": "nodemon src/main/app.js",
+    "event-worker": "node src/main/eventWorker.js",
+    "migrate": "node src/infrastructure/persistence/postgres/migrate.js",
     "test": "node --test"
   },
   "keywords": [],

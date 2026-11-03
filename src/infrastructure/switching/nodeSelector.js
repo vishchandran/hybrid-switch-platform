@@ -1,6 +1,6 @@
 const switchNodes = ["Switch-A", "Switch-B"];
-const { getNodeStatus } = require("./nodeHealthService");
-const { selectSwitchNode: applySelectionPolicy } = require("../src/domain/switching/selectSwitchNode");
+const { getNodeStatus } = require("./nodeRegistry");
+const { selectSwitchNode: applySelectionPolicy } = require("../../domain/switching/selectSwitchNode");
 
 let nextNodeIndex = 0;
 

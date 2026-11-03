@@ -1,15 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { app } = require("../app");
-const { setNodeStatus } = require("../services/nodeHealthService");
-const { publishEvent } = require("../services/eventPublisherService");
-const { listDeadLetters } = require("../store/deadLetterStore");
-const { listOutboxEvents } = require("../store/outboxStore");
-const { listReconciliationRecords } = require("../store/reconciliationStore");
-const { validateProductionConfig } = require("../config/runtimeConfig");
-const { removeSensitiveFields, sanitizeText } = require("../utils/sensitiveData");
-const { getBrokerMode } = require("../services/brokerService");
-const { getRedisConnectionOptions } = require("../broker/bullmqConnection");
+const { app } = require("../src/main/app");
+const { setNodeStatus } = require("../src/infrastructure/switching/nodeRegistry");
+const { publishEvent } = require("../src/infrastructure/messaging/eventPublisher");
+const { listDeadLetters } = require("../src/infrastructure/persistence/deadLetterRepository");
+const { listOutboxEvents } = require("../src/infrastructure/persistence/outboxRepository");
+const { listReconciliationRecords } = require("../src/infrastructure/persistence/reconciliationRepository");
+const { validateProductionConfig } = require("../src/infrastructure/config/runtimeConfig");
+const { removeSensitiveFields, sanitizeText } = require("../src/infrastructure/security/sensitiveData");
+const { getBrokerMode } = require("../src/infrastructure/messaging/brokerPublisher");
+const { getRedisConnectionOptions } = require("../src/infrastructure/messaging/bullmqConnection");
 
 process.env.CLIENT_API_KEY = "test-client-key";
 process.env.ADMIN_API_KEY = "test-admin-key";
