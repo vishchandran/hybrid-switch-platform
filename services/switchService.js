@@ -1,23 +1,24 @@
 const crypto = require("crypto");
 const { getIssuerResponse } = require("./issuerResponseService");
-const { resolveScenario } = require("./scenarioResolverService");
+const { resolveScenario } = require("../src/domain/routing/resolveScenario");
 const { selectSwitchNode } = require("./switchNodeSelectorService");
-const { routeToIssuer } = require("./issuerGatewayService");
-const { validatePin } = require("./pinValidationService");
-const { authorizeTransaction } = require("./authorizationService");
-const { buildReversalEvent } = require("./reversalEventService");
-const { processStandIn } = require("./standInProcessingService");
+const { resolveIssuer } = require("../src/domain/routing/resolveIssuer");
+const { validatePin } = require("../src/domain/authorization/validatePin");
+const { authorizeTransaction } = require("../src/domain/authorization/authorizeTransaction");
+const { processStandIn } = require("../src/domain/authorization/processStandIn");
+const { buildReversalEvent } = require("../src/domain/settlement/buildReversalEvent");
 const { publishEvent } = require("./eventPublisherService");
 const { saveTransaction } = require("../store/transactionStore");
-const { buildFraudEvent } = require("./fraudEventService");
-const { buildSettlementEvent } = require("./settlementEventService");
+const { buildFraudEvent } = require("../src/domain/risk/buildFraudEvent");
+const { buildSettlementEvent } = require("../src/domain/settlement/buildSettlementEvent");
 const { buildAnalyticsEvent } = require("./analyticsEventService");
-const { buildIso8583Summary } = require("./iso8583MessageService");
+const { buildIso8583Summary } = require("../src/domain/messaging/buildIso8583Summary");
+const { getAccount } = require("./accountService");
 const { saveReconciliationRecord } = require("../store/reconciliationStore");
 const {
   addLifecycleState,
   createLifecycle
-} = require("./transactionLifecycleService");
+} = require("../src/domain/transaction/lifecycle");
 
 async function publishAuthorizationAndAnalytics(response, transaction) {
   await publishEvent("AUTHORIZATION_EVENT", response);
@@ -30,7 +31,7 @@ async function processTransaction(transaction) {
   const switchNode = selectSwitchNode();
   addLifecycleState(lifecycle, "SWITCH_NODE_SELECTED");
   const scenario = resolveScenario(transaction);
-  const issuerRouting = routeToIssuer(transaction);
+  const issuerRouting = resolveIssuer(transaction);
   addLifecycleState(lifecycle, "ISSUER_ROUTED");
 
   if (switchNode === "NO_ACTIVE_NODE") {
@@ -124,7 +125,8 @@ async function processTransaction(transaction) {
     return response;
   }
 
-  const authorizationResult = authorizeTransaction(transaction);
+  const account = getAccount(transaction.cardNumber);
+  const authorizationResult = authorizeTransaction(transaction, account);
   addLifecycleState(lifecycle, "AUTHORIZED");
 
   const response = {
