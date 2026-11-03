@@ -1,4 +1,4 @@
-const { isDatabaseConfigured, query } = require("../db/postgres");
+const { isDatabaseConfigured, query } = require("../src/infrastructure/persistence/postgres/postgres");
 
 const transactions = {};
 
