@@ -1,8 +1,9 @@
 const express = require("express");
-const router = express.Router();
 
-const { updateNodeStatus } = require("../controllers/adminController");
+function createAdminRoutes(controller) {
+  const router = express.Router();
+  router.post("/node-status", controller.updateNodeStatus);
+  return router;
+}
 
-router.post("/node-status", updateNodeStatus);
-
-module.exports = router;
+module.exports = { createAdminRoutes };

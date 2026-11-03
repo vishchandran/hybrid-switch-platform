@@ -1,14 +1,12 @@
 const express = require("express");
-const router = express.Router();
 const { validateTransactionRequest } = require("../middleware/transactionValidation");
 const { idempotency } = require("../middleware/idempotency");
 
-const {
-  createTransaction,
-  getTransactionById
-} = require("../controllers/transactionController");
+function createTransactionRoutes(controller) {
+  const router = express.Router();
+  router.post("/", validateTransactionRequest, idempotency, controller.createTransaction);
+  router.get("/:id", controller.getTransactionById);
+  return router;
+}
 
-router.post("/", validateTransactionRequest, idempotency, createTransaction);
-router.get("/:id", getTransactionById);
-
-module.exports = router;
+module.exports = { createTransactionRoutes };
