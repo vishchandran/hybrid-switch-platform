@@ -5,9 +5,9 @@ const transactionRepository = require("../infrastructure/persistence/transaction
 const reconciliationRepository = require("../infrastructure/persistence/reconciliationRepository");
 const sensitiveData = require("../infrastructure/security/sensitiveData");
 const { validatePin } = require("../domain/authorization/validatePin");
-const { buildAnalyticsEvent } = require("../../services/analyticsEventService");
+const { buildAnalyticsEvent } = require("../domain/analytics/buildAnalyticsEvent");
 const { publishEvent } = require("../../services/eventPublisherService");
-const { getIssuerResponse } = require("../../services/issuerResponseService");
+const { authorize: authorizeWithIssuer } = require("../infrastructure/issuer/simulatedIssuerClient");
 const { selectSwitchNode } = require("../../services/switchNodeSelectorService");
 const { getNodeStatus, setNodeStatus } = require("../../services/nodeHealthService");
 const { saveDeadLetter } = require("../../store/deadLetterStore");
@@ -18,7 +18,7 @@ function createContainer() {
     analyticsEventBuilder: buildAnalyticsEvent,
     eventPublisher: { publish: publishEvent },
     idGenerator: { generate: () => crypto.randomUUID() },
-    issuerClient: { authorize: getIssuerResponse },
+    issuerClient: { authorize: authorizeWithIssuer },
     nodeSelector: { selectNode: selectSwitchNode },
     pinVerifier: { verify: validatePin },
     reconciliationRepository,
