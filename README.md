@@ -4,6 +4,20 @@ This project is an Interac-inspired ATM/POS switch simulator. I built it to show
 
 It is not a production payment switch. The goal is to make the core ideas visible: routing, authorization, failover, retries, stand-in processing, reversals, idempotency, durable events, and consumer behavior.
 
+## Architecture
+
+The implementation is organized under `src/` with inward-pointing dependencies:
+
+```text
+src/
+├── domain/          Pure payment and switching rules
+├── application/     Use cases and infrastructure-independent ports
+├── infrastructure/  HTTP, persistence, messaging, security, and external adapters
+└── main/            Dependency wiring and executable entry points
+```
+
+The domain layer has no Express, PostgreSQL, Redis, BullMQ, or environment dependencies. Application code may depend on the domain, infrastructure implements application ports, and `src/main` assembles the running system.
+
 ## What It Demonstrates
 
 - POS purchases, ATM cash withdrawals, and balance inquiries

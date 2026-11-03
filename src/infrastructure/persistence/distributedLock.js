@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { isDatabaseConfigured, query } = require("../src/infrastructure/persistence/postgres/postgres");
+const { isDatabaseConfigured, query } = require("./postgres/postgres");
 
 const memoryLocks = new Set();
 

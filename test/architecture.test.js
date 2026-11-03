@@ -48,3 +48,18 @@ test("domain layer does not import framework or adapter packages", () => {
 test("application layer does not depend on infrastructure", () => {
   assertLayerDoesNotImport("application", ["infrastructure"]);
 });
+
+test("legacy root code directories remain removed", () => {
+  const legacyDirectories = [
+    "broker", "config", "consumers", "controllers", "db",
+    "middleware", "routes", "services", "store", "utils"
+  ];
+  const remainingCode = legacyDirectories.flatMap(directory => {
+    const directoryPath = path.join(__dirname, "..", directory);
+    return fs.existsSync(directoryPath) ? javascriptFiles(directoryPath) : [];
+  });
+  assert.deepEqual(
+    remainingCode.map(file => path.relative(path.join(__dirname, ".."), file)),
+    []
+  );
+});

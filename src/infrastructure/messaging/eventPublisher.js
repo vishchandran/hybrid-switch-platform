@@ -1,6 +1,6 @@
-const { processOutboxEvent } = require("./outboxProcessorService");
-const { saveOutboxEvent } = require("../store/outboxStore");
-const { topicFor, topicMap } = require("../src/application/events/topicMap");
+const { processOutboxEvent } = require("./outboxProcessor");
+const { saveOutboxEvent } = require("../persistence/outboxRepository");
+const { topicFor, topicMap } = require("../../application/events/topicMap");
 
 async function publishEvent(eventType, payload) {
   const topic = topicFor(eventType);

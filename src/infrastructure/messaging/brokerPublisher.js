@@ -1,5 +1,5 @@
-const { consumeEvent } = require("../src/infrastructure/messaging/eventConsumer");
-const { getEventQueue } = require("../src/infrastructure/messaging/bullmqConnection");
+const { consumeEvent } = require("./eventConsumer");
+const { getEventQueue } = require("./bullmqConnection");
 
 function getBrokerMode() {
   return process.env.BROKER_MODE || "IN_PROCESS_SIMULATED";

@@ -13,12 +13,12 @@ const {
   buildCorsOptions,
   validateProductionConfig
 } = require("../infrastructure/config/runtimeConfig");
-const { getTransactionMetrics } = require("../../store/transactionStore");
-const { getEventMetrics } = require("../../store/outboxStore");
-const { getDeadLetterMetrics } = require("../../store/deadLetterStore");
-const { getReconciliationMetrics } = require("../../store/reconciliationStore");
-const { getBrokerMode } = require("../../services/brokerService");
-const { getPinSecurityMode } = require("../../services/pinSecurityService");
+const { getTransactionMetrics } = require("../infrastructure/persistence/transactionRepository");
+const { getEventMetrics } = require("../infrastructure/persistence/outboxRepository");
+const { getDeadLetterMetrics } = require("../infrastructure/persistence/deadLetterRepository");
+const { getReconciliationMetrics } = require("../infrastructure/persistence/reconciliationRepository");
+const { getBrokerMode } = require("../infrastructure/messaging/brokerPublisher");
+const { getPinSecurityMode } = require("../infrastructure/security/pinSecurity");
 const { createContainer } = require("./container");
 
 const app = express();

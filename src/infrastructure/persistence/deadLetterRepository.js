@@ -1,6 +1,6 @@
 const crypto = require("crypto");
-const { isDatabaseConfigured, query } = require("../src/infrastructure/persistence/postgres/postgres");
-const { removeSensitiveFields, sanitizeText } = require("../src/infrastructure/security/sensitiveData");
+const { isDatabaseConfigured, query } = require("./postgres/postgres");
+const { removeSensitiveFields, sanitizeText } = require("../security/sensitiveData");
 
 const deadLetters = [];
 

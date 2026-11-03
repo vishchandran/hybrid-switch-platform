@@ -1,5 +1,5 @@
-const { consumeEvent } = require("./src/infrastructure/messaging/eventConsumer");
-const { createEventWorker, closeBroker } = require("./src/infrastructure/messaging/bullmqConnection");
+const { consumeEvent } = require("../infrastructure/messaging/eventConsumer");
+const { createEventWorker, closeBroker } = require("../infrastructure/messaging/bullmqConnection");
 
 const worker = createEventWorker(async event => {
   consumeEvent(event.topic, event.eventType, event.payload);

@@ -6,11 +6,11 @@ const reconciliationRepository = require("../infrastructure/persistence/reconcil
 const sensitiveData = require("../infrastructure/security/sensitiveData");
 const { validatePin } = require("../domain/authorization/validatePin");
 const { buildAnalyticsEvent } = require("../domain/analytics/buildAnalyticsEvent");
-const { publishEvent } = require("../../services/eventPublisherService");
+const { publishEvent } = require("../infrastructure/messaging/eventPublisher");
 const { authorize: authorizeWithIssuer } = require("../infrastructure/issuer/simulatedIssuerClient");
-const { selectSwitchNode } = require("../../services/switchNodeSelectorService");
-const { getNodeStatus, setNodeStatus } = require("../../services/nodeHealthService");
-const { saveDeadLetter } = require("../../store/deadLetterStore");
+const { selectSwitchNode } = require("../infrastructure/switching/nodeSelector");
+const { getNodeStatus, setNodeStatus } = require("../infrastructure/switching/nodeRegistry");
+const { saveDeadLetter } = require("../infrastructure/persistence/deadLetterRepository");
 
 function createContainer() {
   const processTransaction = createProcessTransaction({
